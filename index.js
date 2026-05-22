@@ -9,7 +9,7 @@ const yts = require("yt-search");
 ========================= */
 
 const BOT_TOKEN =
-  process.env.BOT_TOKEN || "YOUR_BOT_TOKEN";
+  process.env.BOT_TOKEN || "8314736748:AAEzkKvI-6E2dNFdI2Tad3aWhcUcbNxXulc";
 
 const BASE_API =
   "https://rabbitapi.nett.to";

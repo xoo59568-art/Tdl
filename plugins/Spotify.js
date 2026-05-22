@@ -15,22 +15,24 @@ const api = axios.create({
 
 module.exports = (bot) => {
 
-  bot.onText(/^\/spotify (.+)/, async (msg, match) => {
+  /* AUTO SPOTIFY URL DETECT */
+
+  bot.on("message", async (msg) => {
 
     try {
 
       const chatId = msg.chat.id;
-      const url = match[1];
+      const text = msg.text;
 
-      /* CHECK URL */
+      /* CHECK TEXT */
 
-      if (!url.includes("spotify.com")) {
+      if (!text) return;
 
-        return bot.sendMessage(
-          chatId,
-          "❌ Give a valid Spotify track URL"
-        );
-      }
+      /* CHECK SPOTIFY TRACK URL */
+
+      if (
+        !text.includes("open.spotify.com/track/")
+      ) return;
 
       /* WAIT MESSAGE */
 
@@ -42,7 +44,7 @@ module.exports = (bot) => {
       /* API REQUEST */
 
       const { data } = await api.get(
-        `https://rabbitapi.nett.to/api/spotify?url=${encodeURIComponent(url)}`
+        `https://rabbitapi.nett.to/api/spotify?url=${encodeURIComponent(text)}`
       );
 
       console.log(
@@ -68,7 +70,7 @@ module.exports = (bot) => {
         );
       }
 
-      /* AUDIO URL */
+      /* GET AUDIO URL */
 
       const audio = res?.url;
 
@@ -110,7 +112,7 @@ module.exports = (bot) => {
           err.message
         );
 
-        /* FALLBACK */
+        /* FALLBACK DOCUMENT */
 
         await bot.sendDocument(
           chatId,

@@ -4,15 +4,23 @@ const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const yts = require("yt-search");
 
-/* =========================
-   CONFIG
-========================= */
-
 const BOT_TOKEN =
-  process.env.BOT_TOKEN || "8314736748:AAEzkKvI-6E2dNFdI2Tad3aWhcUcbNxXulc";
+  process.env.BOT_TOKEN || "YOUR_BOT_TOKEN";
 
 const BASE_API =
   "https://rabbitapi.nett.to";
+
+/* =========================
+   AXIOS
+========================= */
+
+const api = axios.create({
+  timeout: 120000, // 2 minutes
+  headers: {
+    "User-Agent":
+      "Mozilla/5.0"
+  }
+});
 
 /* =========================
    BOT
@@ -25,7 +33,7 @@ const bot = new TelegramBot(
   }
 );
 
-console.log("✅ Bot Started");
+console.log("✅ Bot Running");
 
 /* =========================
    START
@@ -33,15 +41,10 @@ console.log("✅ Bot Started");
 
 bot.onText(/\/start/, async (msg) => {
 
-  const name =
-    msg.from.first_name || "User";
-
   bot.sendMessage(
     msg.chat.id,
 
 `🎬 Multi Downloader Bot
-
-Hello ${name}
 
 Commands:
 
@@ -50,44 +53,15 @@ Commands:
 Example:
  /song alan walker
 
-✅ Supported Platforms
-
-• Instagram
-• Facebook
-• Spotify
-
-📥 Just send any link.
-
-Powered By Rabbit API`
-  );
-});
-
-/* =========================
-   HELP
-========================= */
-
-bot.onText(/\/help/, async (msg) => {
-
-  bot.sendMessage(
-    msg.chat.id,
-
-`📖 Help Menu
-
-🎵 Song Download:
- /song alan walker
-
-🎬 Video Download:
- Send any supported link
-
 ✅ Supported:
-• Instagram
 • Facebook
+• Instagram
 • Spotify`
   );
 });
 
 /* =========================
-   PLATFORM DETECT
+   DETECT PLATFORM
 ========================= */
 
 function detectPlatform(url = "") {
@@ -95,13 +69,13 @@ function detectPlatform(url = "") {
   url = url.toLowerCase();
 
   if (
-    url.includes("instagram.com")
-  ) return "insta";
-
-  if (
     url.includes("facebook.com") ||
     url.includes("fb.watch")
   ) return "fb";
+
+  if (
+    url.includes("instagram.com")
+  ) return "insta";
 
   if (
     url.includes("spotify.com")
@@ -111,142 +85,167 @@ function detectPlatform(url = "") {
 }
 
 /* =========================
-   RESPONSE EXTRACTOR
+   SMART EXTRACTOR
 ========================= */
 
-function extractResponse(type, data) {
+function extractResponse(data) {
+
+  const video =
+
+    data?.hd ||
+    data?.HD ||
+
+    data?.sd ||
+    data?.SD ||
+
+    data?.video ||
+    data?.url ||
+    data?.download ||
+
+    data?.result?.hd ||
+    data?.result?.HD ||
+
+    data?.result?.sd ||
+    data?.result?.SD ||
+
+    data?.result?.video ||
+    data?.result?.url ||
+
+    data?.response?.video ||
+    data?.response?.downloadLink ||
+
+    null;
+
+  const audio =
+
+    data?.mp3 ||
+    data?.audio ||
+    data?.music ||
+    data?.song ||
+
+    data?.result?.mp3 ||
+    data?.result?.audio ||
+    data?.result?.music ||
+
+    null;
 
   return {
 
-    /* =========================
-       VIDEO PRIORITY
-       HD → SD → VIDEO → URL
-    ========================= */
-
-    video:
-
-      data?.hd ||
-
-      data?.HD ||
-
-      data?.result?.hd ||
-
-      data?.result?.HD ||
-
-      data?.sd ||
-
-      data?.SD ||
-
-      data?.result?.sd ||
-
-      data?.result?.SD ||
-
-      data?.video ||
-
-      data?.result?.video ||
-
-      data?.response?.video ||
-
-      data?.response?.downloadLink ||
-
-      data?.url ||
-
-      data?.result?.url ||
-
-      null,
-
-    /* =========================
-       AUDIO / MP3
-    ========================= */
-
-    audio:
-
-      data?.mp3 ||
-
-      data?.audio ||
-
-      data?.music ||
-
-      data?.download ||
-
-      data?.result?.mp3 ||
-
-      data?.result?.audio ||
-
-      data?.result?.music ||
-
-      data?.result?.download ||
-
-      null,
-
-    /* =========================
-       TITLE
-    ========================= */
+    video,
+    audio,
 
     title:
 
       data?.title ||
-
       data?.result?.title ||
-
       data?.response?.title ||
-
-      null,
-
-    /* =========================
-       THUMBNAIL
-    ========================= */
+      "Media",
 
     thumbnail:
 
       data?.thumbnail ||
-
       data?.thumb ||
-
       data?.image ||
-
       data?.cover ||
-
       data?.poster ||
 
       data?.result?.thumbnail ||
-
       data?.result?.thumb ||
-
       data?.result?.image ||
 
-      data?.result?.cover ||
-
       null,
-
-    /* =========================
-       CAPTION
-    ========================= */
 
     caption:
 
       data?.caption ||
-
-      data?.result?.caption ||
-
       data?.description ||
 
+      data?.result?.caption ||
       data?.result?.description ||
 
-      null,
-
-    /* =========================
-       DURATION
-    ========================= */
+      "",
 
     duration:
 
       data?.duration ||
-
       data?.result?.duration ||
-
       null
   };
+}
+
+/* =========================
+   SAFE VIDEO SEND
+========================= */
+
+async function sendVideoSafe(
+  chatId,
+  url,
+  caption = ""
+) {
+
+  try {
+
+    return await bot.sendVideo(
+      chatId,
+      url,
+      {
+        caption,
+        supports_streaming: true
+      }
+    );
+
+  } catch (err) {
+
+    console.log(
+      "Video failed -> Document"
+    );
+
+    return await bot.sendDocument(
+      chatId,
+      url,
+      {
+        caption
+      }
+    );
+  }
+}
+
+/* =========================
+   SAFE AUDIO SEND
+========================= */
+
+async function sendAudioSafe(
+  chatId,
+  url,
+  title = "Audio",
+  caption = ""
+) {
+
+  try {
+
+    return await bot.sendAudio(
+      chatId,
+      url,
+      {
+        title,
+        caption
+      }
+    );
+
+  } catch (err) {
+
+    console.log(
+      "Audio failed -> Document"
+    );
+
+    return await bot.sendDocument(
+      chatId,
+      url,
+      {
+        caption
+      }
+    );
+  }
 }
 
 /* =========================
@@ -268,7 +267,7 @@ bot.onText(
       const wait =
         await bot.sendMessage(
           chatId,
-          "🔍 Searching YouTube..."
+          "🔍 Searching..."
         );
 
       /* YT SEARCH */
@@ -276,10 +275,10 @@ bot.onText(
       const search =
         await yts(query);
 
-      const video =
+      const first =
         search.videos[0];
 
-      if (!video) {
+      if (!first) {
 
         return bot.editMessageText(
           "❌ Song not found",
@@ -291,16 +290,13 @@ bot.onText(
         );
       }
 
-      const ytUrl =
-        video.url;
-
       /* API */
 
-      const api =
-`${BASE_API}/api/Spotify?url=${encodeURIComponent(ytUrl)}`;
+      const url =
+`${BASE_API}/api/Song?url=${encodeURIComponent(first.url)}`;
 
       const { data } =
-        await axios.get(api);
+        await api.get(url);
 
       console.log(
         JSON.stringify(
@@ -311,10 +307,7 @@ bot.onText(
       );
 
       const response =
-        extractResponse(
-          "spotify",
-          data
-        );
+        extractResponse(data);
 
       await bot.deleteMessage(
         chatId,
@@ -334,7 +327,7 @@ bot.onText(
             caption:
               response.caption ||
 
-              `🎵 ${response.title || video.title}`
+              `🎵 ${response.title}`
           }
         );
       }
@@ -345,27 +338,13 @@ bot.onText(
         response.audio
       ) {
 
-        return await bot.sendAudio(
+        await sendAudioSafe(
           chatId,
           response.audio,
-          {
-            title:
-              response.title ||
-              video.title,
-
-            performer:
-              video.author.name,
-
-            caption:
-              response.caption || ""
-          }
+          response.title,
+          response.caption
         );
       }
-
-      bot.sendMessage(
-        chatId,
-        "❌ Audio not found"
-      );
 
     } catch (err) {
 
@@ -373,14 +352,14 @@ bot.onText(
 
       bot.sendMessage(
         chatId,
-        "❌ Song download failed"
+        "❌ Song failed"
       );
     }
   }
 );
 
 /* =========================
-   LINK HANDLER
+   MAIN LINK HANDLER
 ========================= */
 
 bot.on(
@@ -397,7 +376,6 @@ bot.on(
 
     if (
       text.startsWith("/start") ||
-      text.startsWith("/help") ||
       text.startsWith("/song")
     ) return;
 
@@ -407,7 +385,7 @@ bot.on(
 
       return bot.sendMessage(
         chatId,
-        "❌ Send a valid link"
+        "❌ Send valid link"
       );
     }
 
@@ -426,17 +404,17 @@ bot.on(
 
       switch (type) {
 
-        case "insta":
-
-          endpoint =
-`/api/insta?url=${encodeURIComponent(text)}`;
-
-          break;
-
         case "fb":
 
           endpoint =
 `/api/fb?url=${encodeURIComponent(text)}`;
+
+          break;
+
+        case "insta":
+
+          endpoint =
+`/api/insta?url=${encodeURIComponent(text)}`;
 
           break;
 
@@ -459,11 +437,11 @@ bot.on(
           );
       }
 
-      const api =
+      const url =
 `${BASE_API}${endpoint}`;
 
       const { data } =
-        await axios.get(api);
+        await api.get(url);
 
       console.log(
         JSON.stringify(
@@ -474,17 +452,14 @@ bot.on(
       );
 
       const response =
-        extractResponse(
-          type,
-          data
-        );
+        extractResponse(data);
 
       await bot.deleteMessage(
         chatId,
         wait.message_id
       );
 
-      /* THUMB */
+      /* THUMBNAIL */
 
       if (
         response.thumbnail
@@ -496,8 +471,7 @@ bot.on(
           {
             caption:
               response.caption ||
-
-              `🎬 ${response.title || "Media"}`
+              response.title
           }
         );
       }
@@ -508,15 +482,10 @@ bot.on(
         response.video
       ) {
 
-        await bot.sendVideo(
+        await sendVideoSafe(
           chatId,
           response.video,
-          {
-            caption:
-              response.caption || "",
-
-            supports_streaming: true
-          }
+          response.caption
         );
       }
 
@@ -526,17 +495,11 @@ bot.on(
         response.audio
       ) {
 
-        await bot.sendAudio(
+        await sendAudioSafe(
           chatId,
           response.audio,
-          {
-            title:
-              response.title ||
-              "Audio",
-
-            caption:
-              response.caption || ""
-          }
+          response.title,
+          response.caption
         );
       }
 

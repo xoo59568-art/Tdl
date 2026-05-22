@@ -1,117 +1,137 @@
 // plugins/song.js
 
-const axios = require("axios");
-const yts = require("yt-search");
+const axios =
+  require("axios");
 
-const api = axios.create({
-  timeout: 180000, // 3 minute
-  headers: {
-    "User-Agent": "Mozilla/5.0"
-  }
-});
+const yts =
+  require("yt-search");
+
+/* =========================
+   API
+========================= */
+
+const api =
+  axios.create({
+
+    timeout: 180000,
+
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0"
+    }
+  });
 
 module.exports = (bot) => {
 
-  bot.on("message", async (msg) => {
+  bot.onText(
+    /^\/song (.+)/,
 
-    try {
+    async (
+      msg,
+      match
+    ) => {
 
-      const text = msg.text;
+      try {
 
-      if (!text) return;
+        const chatId =
+          msg.chat.id;
 
-      if (!text.startsWith("/song ")) return;
+        const query =
+          match[1];
 
-      const query = text.slice(6).trim();
+        /* WAIT */
 
-      if (!query) {
+        const wait =
+          await bot.sendMessage(
+            chatId,
+            "🔍 Searching Song..."
+          );
 
-        return bot.sendMessage(
-          msg.chat.id,
-          "❌ Song name needed"
+        /* SEARCH YOUTUBE */
+
+        const search =
+          await yts(query);
+
+        const first =
+          search.videos[0];
+
+        if (!first) {
+
+          return bot.editMessageText(
+            "❌ Song not found",
+            {
+              chat_id:
+                chatId,
+
+              message_id:
+                wait.message_id
+            }
+          );
+        }
+
+        /* API REQUEST */
+
+        const {
+          data
+        } = await api.get(
+
+`https://rabbitapi.nett.to/api/song?url=${encodeURIComponent(first.url)}`
         );
-      }
 
-      const chatId = msg.chat.id;
-
-      const wait = await bot.sendMessage(
-        chatId,
-        "🔍 Searching Song..."
-      );
-
-      // youtube search
-      const search = await yts(query);
-
-      const video = search.videos[0];
-
-      if (!video) {
+        console.log(
+          JSON.stringify(
+            data,
+            null,
+            2
+          )
+        );
 
         await bot.deleteMessage(
           chatId,
           wait.message_id
         );
 
-        return bot.sendMessage(
-          chatId,
-          "❌ Song not found"
-        );
-      }
+        /* AUDIO URL */
 
-      console.log(
-        "YT FOUND =>",
-        video.title
-      );
+        const audio =
+          data?.url;
 
-      // api request
-      const { data } = await api.get(
-        `https://rabbitapi.nett.to/api/song?url=${encodeURIComponent(video.url)}`
-      );
+        if (!audio) {
 
-      console.log(
-        JSON.stringify(data, null, 2)
-      );
-
-      await bot.deleteMessage(
-        chatId,
-        wait.message_id
-      );
-
-      const audio =
-        data?.response?.result?.url ||
-        data?.response?.result?.mp3 ||
-        data?.response?.result?.audio ||
-        data?.response?.result?.download;
-
-      if (!audio) {
-
-        return bot.sendMessage(
-          chatId,
-          "❌ Audio not found"
-        );
-      }
-
-      // send audio
-      return await bot.sendAudio(
-        chatId,
-        audio,
-        {
-          timeout: 180000, // 3 minute
-          title: video.title,
-          performer: video.author.name
+          return bot.sendMessage(
+            chatId,
+            "❌ Audio not found"
+          );
         }
-      );
 
-    } catch (err) {
+        /* SEND AUDIO */
 
-      console.log(
-        "SONG ERROR =>",
-        err
-      );
+        try {
 
-      bot.sendMessage(
-        msg.chat.id,
-        "❌ Song failed"
-      );
+          await bot.sendAudio(
+            chatId,
+            audio
+          );
+
+        } catch {
+
+          /* FALLBACK */
+
+          await bot.sendDocument(
+            chatId,
+            audio
+          );
+        }
+
+      } catch (err) {
+
+        console.log(err);
+
+        bot.sendMessage(
+          msg.chat.id,
+          "❌ Song download failed"
+        );
+      }
     }
-  });
+  );
 };

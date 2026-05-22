@@ -62,6 +62,13 @@ module.exports = (bot) => {
         telegramFile
       );
 
+      /* GET ORIGINAL FILE NAME */
+
+      const fileName =
+        file.file_path
+          .split("/")
+          .pop();
+
       /* DOWNLOAD FILE */
 
       const response =
@@ -79,7 +86,7 @@ module.exports = (bot) => {
       form.append(
         "file",
         response.data,
-        "upload"
+        fileName
       );
 
       /* UPLOAD TO CDN */

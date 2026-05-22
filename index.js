@@ -9,7 +9,7 @@ const yts = require("yt-search");
 ========================= */
 
 const BOT_TOKEN =
-  process.env.BOT_TOKEN || "8314736748:AAEzkKvI-6E2dNFdI2Tad3aWhcUcbNxXulc";
+  process.env.BOT_TOKEN || "YOUR_BOT_TOKEN";
 
 const BASE_API =
   "https://rabbitapi.nett.to";
@@ -52,13 +52,11 @@ Example:
 
 ✅ Supported Platforms
 
-• YouTube
-• Facebook
 • Instagram
-• TikTok
-• Twitter/X
+• Facebook
+• Spotify
 
-📥 Just send any video link.
+📥 Just send any link.
 
 Powered By Rabbit API`
   );
@@ -82,13 +80,174 @@ bot.onText(/\/help/, async (msg) => {
  Send any supported link
 
 ✅ Supported:
-• YouTube
-• Facebook
 • Instagram
-• TikTok
-• Twitter/X`
+• Facebook
+• Spotify`
   );
 });
+
+/* =========================
+   PLATFORM DETECT
+========================= */
+
+function detectPlatform(url = "") {
+
+  url = url.toLowerCase();
+
+  if (
+    url.includes("instagram.com")
+  ) return "insta";
+
+  if (
+    url.includes("facebook.com") ||
+    url.includes("fb.watch")
+  ) return "fb";
+
+  if (
+    url.includes("spotify.com")
+  ) return "spotify";
+
+  return "unknown";
+}
+
+/* =========================
+   RESPONSE EXTRACTOR
+========================= */
+
+function extractResponse(type, data) {
+
+  return {
+
+    /* =========================
+       VIDEO PRIORITY
+       HD → SD → VIDEO → URL
+    ========================= */
+
+    video:
+
+      data?.hd ||
+
+      data?.HD ||
+
+      data?.result?.hd ||
+
+      data?.result?.HD ||
+
+      data?.sd ||
+
+      data?.SD ||
+
+      data?.result?.sd ||
+
+      data?.result?.SD ||
+
+      data?.video ||
+
+      data?.result?.video ||
+
+      data?.response?.video ||
+
+      data?.response?.downloadLink ||
+
+      data?.url ||
+
+      data?.result?.url ||
+
+      null,
+
+    /* =========================
+       AUDIO / MP3
+    ========================= */
+
+    audio:
+
+      data?.mp3 ||
+
+      data?.audio ||
+
+      data?.music ||
+
+      data?.download ||
+
+      data?.result?.mp3 ||
+
+      data?.result?.audio ||
+
+      data?.result?.music ||
+
+      data?.result?.download ||
+
+      null,
+
+    /* =========================
+       TITLE
+    ========================= */
+
+    title:
+
+      data?.title ||
+
+      data?.result?.title ||
+
+      data?.response?.title ||
+
+      null,
+
+    /* =========================
+       THUMBNAIL
+    ========================= */
+
+    thumbnail:
+
+      data?.thumbnail ||
+
+      data?.thumb ||
+
+      data?.image ||
+
+      data?.cover ||
+
+      data?.poster ||
+
+      data?.result?.thumbnail ||
+
+      data?.result?.thumb ||
+
+      data?.result?.image ||
+
+      data?.result?.cover ||
+
+      null,
+
+    /* =========================
+       CAPTION
+    ========================= */
+
+    caption:
+
+      data?.caption ||
+
+      data?.result?.caption ||
+
+      data?.description ||
+
+      data?.result?.description ||
+
+      null,
+
+    /* =========================
+       DURATION
+    ========================= */
+
+    duration:
+
+      data?.duration ||
+
+      data?.result?.duration ||
+
+      null
+  };
+}
 
 /* =========================
    SONG COMMAND
@@ -98,9 +257,11 @@ bot.onText(
   /^\/song (.+)/,
   async (msg, match) => {
 
-    const chatId = msg.chat.id;
+    const chatId =
+      msg.chat.id;
 
-    const query = match[1];
+    const query =
+      match[1];
 
     try {
 
@@ -124,78 +285,86 @@ bot.onText(
           "❌ Song not found",
           {
             chat_id: chatId,
-            message_id: wait.message_id
+            message_id:
+              wait.message_id
           }
         );
       }
 
-      const ytUrl = video.url;
+      const ytUrl =
+        video.url;
 
       /* API */
 
       const api =
-`${BASE_API}/api/song?url=${encodeURIComponent(ytUrl)}`;
+`${BASE_API}/api/Spotify?url=${encodeURIComponent(ytUrl)}`;
 
       const { data } =
-        await axios.get(api, {
-          timeout: 60000
-        });
+        await axios.get(api);
 
-      console.log(data);
+      console.log(
+        JSON.stringify(
+          data,
+          null,
+          2
+        )
+      );
 
-      const audio =
-        data?.result?.download ||
-        data?.result?.url ||
-        data?.download ||
-        data?.url;
-
-      if (!audio) {
-
-        return bot.editMessageText(
-          "❌ Download failed",
-          {
-            chat_id: chatId,
-            message_id: wait.message_id
-          }
+      const response =
+        extractResponse(
+          "spotify",
+          data
         );
-      }
 
       await bot.deleteMessage(
         chatId,
         wait.message_id
       );
 
-      /* THUMBNAIL */
+      /* THUMB */
 
-      await bot.sendPhoto(
-        chatId,
-        video.thumbnail,
-        {
-          caption:
-`🎵 ${video.title}
+      if (
+        response.thumbnail
+      ) {
 
-👤 ${video.author.name}
-⏱ ${video.timestamp}
-👀 ${video.views.toLocaleString()} Views`
-        }
-      );
+        await bot.sendPhoto(
+          chatId,
+          response.thumbnail,
+          {
+            caption:
+              response.caption ||
+
+              `🎵 ${response.title || video.title}`
+          }
+        );
+      }
 
       /* AUDIO */
 
-      await bot.sendAudio(
+      if (
+        response.audio
+      ) {
+
+        return await bot.sendAudio(
+          chatId,
+          response.audio,
+          {
+            title:
+              response.title ||
+              video.title,
+
+            performer:
+              video.author.name,
+
+            caption:
+              response.caption || ""
+          }
+        );
+      }
+
+      bot.sendMessage(
         chatId,
-        audio,
-        {
-          title: video.title,
-          performer:
-            video.author.name,
-
-          caption:
-`✅ Song Downloaded
-
-🎵 ${video.title}
-⏱ ${video.timestamp}`
-        }
+        "❌ Audio not found"
       );
 
     } catch (err) {
@@ -211,43 +380,7 @@ bot.onText(
 );
 
 /* =========================
-   PLATFORM DETECT
-========================= */
-
-function detectPlatform(
-  url = ""
-) {
-
-  url = url.toLowerCase();
-
-  if (
-    url.includes("youtube.com") ||
-    url.includes("youtu.be")
-  ) return "youtube";
-
-  if (
-    url.includes("facebook.com") ||
-    url.includes("fb.watch")
-  ) return "facebook";
-
-  if (
-    url.includes("instagram.com")
-  ) return "instagram";
-
-  if (
-    url.includes("tiktok.com")
-  ) return "tiktok";
-
-  if (
-    url.includes("twitter.com") ||
-    url.includes("x.com")
-  ) return "twitter";
-
-  return "unknown";
-}
-
-/* =========================
-   VIDEO HANDLER
+   LINK HANDLER
 ========================= */
 
 bot.on(
@@ -274,7 +407,7 @@ bot.on(
 
       return bot.sendMessage(
         chatId,
-        "❌ Send a valid video link"
+        "❌ Send a valid link"
       );
     }
 
@@ -283,7 +416,7 @@ bot.on(
       const wait =
         await bot.sendMessage(
           chatId,
-          "🔍 Processing video..."
+          "🔍 Processing..."
         );
 
       const type =
@@ -293,38 +426,24 @@ bot.on(
 
       switch (type) {
 
-        case "youtube":
+        case "insta":
 
           endpoint =
-`/api/play?q=${encodeURIComponent(text)}`;
+`/api/insta?url=${encodeURIComponent(text)}`;
 
           break;
 
-        case "facebook":
+        case "fb":
 
           endpoint =
-`/api/facebook?url=${encodeURIComponent(text)}`;
+`/api/fb?url=${encodeURIComponent(text)}`;
 
           break;
 
-        case "instagram":
+        case "spotify":
 
           endpoint =
-`/api/instagram?url=${encodeURIComponent(text)}`;
-
-          break;
-
-        case "tiktok":
-
-          endpoint =
-`/api/tiktok?url=${encodeURIComponent(text)}`;
-
-          break;
-
-        case "twitter":
-
-          endpoint =
-`/api/twitter?url=${encodeURIComponent(text)}`;
+`/api/Spotify?url=${encodeURIComponent(text)}`;
 
           break;
 
@@ -344,83 +463,93 @@ bot.on(
 `${BASE_API}${endpoint}`;
 
       const { data } =
-        await axios.get(api, {
-          timeout: 60000
-        });
+        await axios.get(api);
 
-      console.log(data);
+      console.log(
+        JSON.stringify(
+          data,
+          null,
+          2
+        )
+      );
 
-      const video =
-        data?.response?.downloadLink ||
-        data?.response?.video ||
-        data?.result?.video ||
-        data?.result?.url ||
-        data?.video ||
-        data?.url;
-
-      const title =
-        data?.response?.title ||
-        data?.result?.title ||
-        data?.title ||
-        "Unknown";
-
-      const thumbnail =
-        data?.response?.thumbnail ||
-        data?.result?.thumbnail ||
-        data?.thumbnail;
-
-      const duration =
-        data?.response?.duration ||
-        data?.result?.duration ||
-        data?.duration ||
-        "Unknown";
-
-      if (!video) {
-
-        return bot.editMessageText(
-          "❌ Video not found",
-          {
-            chat_id: chatId,
-            message_id:
-              wait.message_id
-          }
+      const response =
+        extractResponse(
+          type,
+          data
         );
-      }
 
       await bot.deleteMessage(
         chatId,
         wait.message_id
       );
 
-      if (thumbnail) {
+      /* THUMB */
+
+      if (
+        response.thumbnail
+      ) {
 
         await bot.sendPhoto(
           chatId,
-          thumbnail,
+          response.thumbnail,
           {
             caption:
-`🎬 ${title}
+              response.caption ||
 
-🌐 Platform: ${type}
-⏱ ${duration}`
+              `🎬 ${response.title || "Media"}`
           }
         );
       }
 
-      await bot.sendVideo(
-        chatId,
-        video,
-        {
-          caption:
-`✅ Download Complete
+      /* VIDEO */
 
-🎬 ${title}
-🌐 ${type}
-⏱ ${duration}`,
+      if (
+        response.video
+      ) {
 
-          supports_streaming: true
-        }
-      );
+        await bot.sendVideo(
+          chatId,
+          response.video,
+          {
+            caption:
+              response.caption || "",
+
+            supports_streaming: true
+          }
+        );
+      }
+
+      /* AUDIO */
+
+      if (
+        response.audio
+      ) {
+
+        await bot.sendAudio(
+          chatId,
+          response.audio,
+          {
+            title:
+              response.title ||
+              "Audio",
+
+            caption:
+              response.caption || ""
+          }
+        );
+      }
+
+      if (
+        !response.video &&
+        !response.audio
+      ) {
+
+        bot.sendMessage(
+          chatId,
+          "❌ Media not found"
+        );
+      }
 
     } catch (err) {
 
